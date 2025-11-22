@@ -10,6 +10,8 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -26,6 +28,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
     private var pressureSensor: Sensor? = null
     private var currentPressure by mutableStateOf(1013.25f) // Default sea level pressure
     private var currentAltitude by mutableStateOf(0f)
+    private var isSimulationMode by mutableStateOf(true) // Always start with simulation mode enabled
 
     companion object {
         private const val P0 = 1013.25f // Sea level standard atmospheric pressure in hPa
@@ -38,11 +41,15 @@ class MainActivity : ComponentActivity(), SensorEventListener {
         sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
         pressureSensor = sensorManager.getDefaultSensor(Sensor.TYPE_PRESSURE)
 
+
         setContent {
             HW6_1Theme {
                 AltimeterScreen(
                     pressure = currentPressure,
-                    altitude = currentAltitude
+                    altitude = currentAltitude,
+                    isSimulationMode = isSimulationMode,
+                    onIncreaseAltitude = { simulatePressureChange(-10f) }, // Decrease pressure = increase altitude
+                    onDecreaseAltitude = { simulatePressureChange(10f) }   // Increase pressure = decrease altitude
                 )
             }
         }
@@ -64,10 +71,13 @@ class MainActivity : ComponentActivity(), SensorEventListener {
     }
 
     override fun onSensorChanged(event: SensorEvent?) {
-        event?.let {
-            if (it.sensor.type == Sensor.TYPE_PRESSURE) {
-                currentPressure = it.values[0]
-                currentAltitude = calculateAltitude(currentPressure)
+        // Only process sensor data if not in simulation mode
+        if (!isSimulationMode) {
+            event?.let {
+                if (it.sensor.type == Sensor.TYPE_PRESSURE) {
+                    currentPressure = it.values[0]
+                    currentAltitude = calculateAltitude(currentPressure)
+                }
             }
         }
     }
@@ -77,10 +87,22 @@ class MainActivity : ComponentActivity(), SensorEventListener {
         // Formula: h = 44330 × (1 - (P/P0)^(1/5.255))
         return 44330 * (1 - (pressure / P0).pow(1 / 5.255f))
     }
+
+    // Simulate pressure changes for testing on emulator
+    private fun simulatePressureChange(delta: Float) {
+        currentPressure = (currentPressure + delta).coerceIn(800f, 1100f)
+        currentAltitude = calculateAltitude(currentPressure)
+    }
 }
 
 @Composable
-fun AltimeterScreen(pressure: Float, altitude: Float) {
+fun AltimeterScreen(
+    pressure: Float,
+    altitude: Float,
+    isSimulationMode: Boolean = false,
+    onIncreaseAltitude: () -> Unit = {},
+    onDecreaseAltitude: () -> Unit = {}
+) {
     // Higher altitude = darker color
     val backgroundColor = calculateBackgroundColor(altitude)
 
@@ -140,8 +162,45 @@ fun AltimeterScreen(pressure: Float, altitude: Float) {
                 )
             }
 
+            // Simulation Mode Controls
+            if (isSimulationMode) {
+                Spacer(modifier = Modifier.height(48.dp))
+
+                Text(
+                    text = "Simulation Mode",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Yellow,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    modifier = Modifier.padding(bottom = 16.dp)
+                ) {
+                    Button(
+                        onClick = onIncreaseAltitude,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF4CAF50)
+                        )
+                    ) {
+                        Text("+100m", fontSize = 16.sp)
+                    }
+
+                    Button(
+                        onClick = onDecreaseAltitude,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFFF44336)
+                        )
+                    ) {
+                        Text("100m", fontSize = 16.sp)
+                    }
+                }
+
+            }
+
             // Additional info
-            Spacer(modifier = Modifier.height(48.dp))
+            Spacer(modifier = Modifier.height(24.dp))
             Text(
                 text = "Sea Level Reference: 1013.25 hPa",
                 fontSize = 14.sp,
