@@ -1,1 +1,1 @@
-Since the Android emulator does not have a barometric sensor, the value will not change
+Tap the +100 and -100 buttons to simulate altitude changes.
